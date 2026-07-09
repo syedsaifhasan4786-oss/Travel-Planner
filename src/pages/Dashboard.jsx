@@ -333,6 +333,26 @@ export default function Dashboard({ session }) {
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Nav */}
+      <nav className="mobile-bottom-nav">
+        <button className="mobile-nav-item active">
+          <Users2 size={20} />
+          Trips
+        </button>
+        <button className="mobile-nav-item" onClick={() => setShowCreateModal(true)}>
+          <Plus size={20} />
+          New Trip
+        </button>
+        <button className="mobile-nav-item" onClick={() => setShowJoinModal(true)}>
+          <LinkIcon size={20} />
+          Join
+        </button>
+        <button className="mobile-nav-item" onClick={handleSignOut}>
+          <LogOut size={20} />
+          Sign Out
+        </button>
+      </nav>
     </div>
   );
 }

@@ -2603,3 +2603,155 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
 }
 
+
+/* ================================================================
+   MOBILE RESPONSIVE - Dashboard & Trip Planner
+   ================================================================ */
+
+@media (max-width: 768px) {
+  /* Hide sidebar, show bottom nav instead */
+  .sidebar-saas {
+    display: none;
+  }
+
+  /* Main content fills full width */
+  .dashboard-saas-container {
+    flex-direction: column;
+  }
+
+  .main-content-saas {
+    padding: 16px 16px 80px;
+  }
+
+  /* Dashboard header stacks on mobile */
+  .dashboard-header-saas {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .dashboard-header-saas > div:last-child {
+    width: 100%;
+    display: flex;
+    gap: 10px;
+  }
+
+  .dashboard-header-saas > div:last-child .btn-saas {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .dashboard-title-saas {
+    font-size: 26px;
+  }
+
+  /* Trip cards: single column */
+  .trips-grid-saas {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* Bottom navigation bar */
+  .mobile-bottom-nav {
+    display: flex !important;
+  }
+
+  /* Trip Planner header */
+  .planner-topbar-saas {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .planner-topbar-saas h2 {
+    font-size: 18px !important;
+  }
+
+  .planner-topbar-saas .planner-meta-saas {
+    font-size: 12px;
+  }
+
+  /* Itinerary panel full width */
+  .itinerary-panel-saas {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modals full screen on mobile */
+  .modal-card-saas {
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .modal-overlay-saas {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  /* Invite bar wraps */
+  .invite-bar-saas {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Panel tabs */
+  .panel-tabs-saas {
+    gap: 6px;
+  }
+
+  /* Expense summary bar */
+  .expense-summary-bar {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Budget modal full width */
+  .budget-modal-wide {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+}
+
+/* Bottom nav - hidden by default, shown on mobile */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--sb-bg-white);
+  border-top: 1px solid var(--sb-border);
+  padding: 10px 24px 20px;
+  z-index: 100;
+  gap: 0;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sb-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 12px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.mobile-nav-item.active,
+.mobile-nav-item:hover {
+  color: var(--sb-teal);
+  background: var(--sb-teal-light);
+}
