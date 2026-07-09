@@ -27,28 +27,25 @@ export default function Auth() {
     setLoading(true);
     setErrorMsg('');
 
+    const redirectTo = `${window.location.origin}/auth`;
+
     try {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { name: name || email.split('@')[0] }
+            data: { name: name || email.split('@')[0] },
+            emailRedirectTo: redirectTo
           }
         });
         if (error) throw error;
-        
-        // Call backend profile creation helper
-        await fetch('http://localhost:3000/api/auth/register-profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${data.session?.access_token || email}`
-          },
-          body: JSON.stringify({ name })
-        }).catch(err => console.error("Error setting up profile on server:", err));
 
-        navigate('/app');
+        if (data.session) {
+          navigate('/app');
+        } else {
+          setErrorMsg('Check your email to confirm your account, then sign in.');
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -64,7 +61,10 @@ export default function Auth() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth` }
+      });
       if (error) throw error;
       navigate('/app');
     } catch (err) {
