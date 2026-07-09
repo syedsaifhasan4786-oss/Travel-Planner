@@ -1382,6 +1382,79 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
 }
 
+.auth-success-alert {
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13.5px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.auth-forgot-btn {
+  background: none;
+  border: none;
+  color: var(--sb-teal);
+  font-size: 13px;
+  font-weight: 700;
+  align-self: flex-end;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+}
+
+.auth-forgot-btn:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .auth-page-container {
+    padding: 14px;
+    align-items: flex-start;
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .auth-card-saas {
+    max-width: 100%;
+    padding: 24px 18px;
+    border-radius: 16px;
+  }
+
+  .auth-header-saas {
+    margin-bottom: 22px;
+  }
+
+  .logo-text-saas {
+    font-size: 20px;
+  }
+
+  .auth-title-saas {
+    font-size: 22px;
+  }
+
+  .auth-subtitle-saas {
+    font-size: 13.5px;
+  }
+
+  .btn-saas {
+    width: 100%;
+  }
+
+  .auth-forgot-btn {
+    align-self: center;
+  }
+
+  .auth-footer-saas {
+    margin-top: 18px;
+    line-height: 1.6;
+  }
+}
+
 /* Dashboard SaaS Layout */
 .dashboard-saas-container {
   display: flex;

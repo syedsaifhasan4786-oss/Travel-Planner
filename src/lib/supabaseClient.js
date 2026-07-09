@@ -31,6 +31,22 @@ class MockAuth {
     return Promise.resolve({ data: { user: session.user, session }, error: null });
   }
 
+  resetPasswordForEmail(email, options) {
+    return Promise.resolve({ data: {}, error: null });
+  }
+
+  updateUser({ password }) {
+    const sessionStr = localStorage.getItem('tripboard_session');
+    if (!sessionStr) return Promise.resolve({ data: { user: null }, error: null });
+
+    try {
+      const session = JSON.parse(sessionStr);
+      return Promise.resolve({ data: { user: session.user }, error: null });
+    } catch (e) {
+      return Promise.resolve({ data: { user: null }, error: null });
+    }
+  }
+
   signInWithPassword({ email, password }) {
     const session = {
       access_token: email, // use email as mock token

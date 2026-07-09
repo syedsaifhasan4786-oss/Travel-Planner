@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Compass, Mail, Lock, ArrowRight, Chrome } from 'lucide-react';
+import { Compass, Mail, Lock, ArrowRight, Chrome, RefreshCw } from 'lucide-react';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -9,9 +9,13 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   // Check if already signed in
   useEffect(() => {
@@ -22,14 +26,37 @@ export default function Auth() {
     });
   }, [navigate]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('mode') === 'recover') {
+      setRecoveryMode(true);
+      setIsSignUp(false);
+      setSuccessMsg('Create a new password to finish resetting your account.');
+    }
+  }, [location.search]);
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+    setSuccessMsg('');
 
     const redirectTo = `${window.location.origin}/auth`;
 
     try {
+      if (recoveryMode) {
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match.');
+        }
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        setSuccessMsg('Password updated. You can now sign in with your new password.');
+        setRecoveryMode(false);
+        setPassword('');
+        setConfirmPassword('');
+        return;
+      }
+
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -53,6 +80,30 @@ export default function Auth() {
       }
     } catch (err) {
       setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErrorMsg('Enter your email address first.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?mode=recover`
+      });
+      if (error) throw error;
+      setResetEmailSent(true);
+      setSuccessMsg('Password reset email sent. Check your inbox to continue.');
+    } catch (err) {
+      setErrorMsg(err.message || 'Unable to send reset email.');
     } finally {
       setLoading(false);
     }
@@ -88,14 +139,19 @@ export default function Auth() {
             {isSignUp ? 'Create your account' : 'Welcome back'}
           </h2>
           <p className="auth-subtitle-saas">
-            {isSignUp ? 'Start planning group trips in real-time.' : 'Sign in to plan with your squad.'}
+            {recoveryMode
+              ? 'Set a new password to regain access.'
+              : isSignUp
+                ? 'Start planning group trips in real-time.'
+                : 'Sign in to plan with your squad.'}
           </p>
         </div>
 
+        {successMsg && <div className="auth-success-alert">{successMsg}</div>}
         {errorMsg && <div className="auth-error-alert">{errorMsg}</div>}
 
         <form className="auth-form-saas" onSubmit={handleAuth}>
-          {isSignUp && (
+          {!recoveryMode && isSignUp && (
             <div className="form-group-saas">
               <label className="form-label-saas" htmlFor="auth-name">Your Name</label>
               <div className="input-with-icon-saas">
@@ -136,7 +192,7 @@ export default function Auth() {
                 type="password"
                 id="auth-password"
                 className="form-input-saas"
-                placeholder="••••••••"
+                placeholder={recoveryMode ? 'Enter new password' : '••••••••'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -144,16 +200,46 @@ export default function Auth() {
             </div>
           </div>
 
+          {recoveryMode && (
+            <div className="form-group-saas">
+              <label className="form-label-saas" htmlFor="auth-confirm-password">Confirm New Password</label>
+              <div className="input-with-icon-saas">
+                <Lock className="input-icon-saas" size={16} />
+                <input
+                  type="password"
+                  id="auth-confirm-password"
+                  className="form-input-saas"
+                  placeholder="Repeat new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             className="btn btn-saas btn-primary-saas"
             disabled={loading}
             style={{ width: '100%', marginTop: '10px' }}
           >
-            {loading ? 'Processing...' : isSignUp ? 'Get Started' : 'Sign In'}
+            {loading ? 'Processing...' : recoveryMode ? 'Update Password' : isSignUp ? 'Get Started' : 'Sign In'}
             {!loading && <ArrowRight size={18} style={{ marginLeft: '8px' }} />}
           </button>
         </form>
+
+        {!recoveryMode && !isSignUp && (
+          <button
+            type="button"
+            className="auth-forgot-btn"
+            onClick={handleForgotPassword}
+            disabled={loading}
+          >
+            <RefreshCw size={14} />
+            {resetEmailSent ? 'Reset email sent again' : 'Forgot password?'}
+          </button>
+        )}
 
         <div className="auth-divider-saas">
           <span>or continue with</span>
@@ -170,7 +256,8 @@ export default function Auth() {
           Google
         </button>
 
-        <div className="auth-footer-saas">
+        {!recoveryMode && (
+          <div className="auth-footer-saas">
           {isSignUp ? 'Already have an account?' : "Don't have an account yet?"}{' '}
           <button
             type="button"
@@ -179,7 +266,8 @@ export default function Auth() {
           >
             {isSignUp ? 'Sign In' : 'Sign Up'}
           </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
