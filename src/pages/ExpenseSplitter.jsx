@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchWithAuth } from '../lib/supabaseClient';
+import { expensesApi } from '../lib/supabaseClient';
 import {
   Receipt,
   Plus,
@@ -72,15 +72,12 @@ function AddExpenseModal({ tripId, members, currentUserId, onClose, onAdded }) {
     setError('');
     setLoading(true);
     try {
-      const created = await fetchWithAuth(`/api/trips/${tripId}/expenses`, {
-        method: 'POST',
-        body: JSON.stringify({
+      const created = await expensesApi.add(tripId, {
           description: form.description,
           amount: Number(form.amount),
           paid_by: form.paid_by,
           split_among: form.split_among
-        })
-      });
+        });
       onAdded(created);
       onClose();
     } catch (err) {
@@ -195,7 +192,7 @@ export default function ExpenseSplitter({ tripId, members, currentUserId }) {
   const fetchExpenses = useCallback(async () => {
     setLoadingExpenses(true);
     try {
-      const data = await fetchWithAuth(`/api/trips/${tripId}/expenses`);
+      const data = await expensesApi.list(tripId);
       setExpenses(data);
     } catch (err) {
       console.error('Failed to load expenses:', err);
@@ -207,7 +204,7 @@ export default function ExpenseSplitter({ tripId, members, currentUserId }) {
   const fetchSettlements = async () => {
     setLoadingSettlements(true);
     try {
-      const data = await fetchWithAuth(`/api/trips/${tripId}/settlements`, { method: 'POST', body: JSON.stringify({}) });
+      const data = await expensesApi.settlements(tripId);
       setSettlements(data);
     } catch (err) {
       console.error('Failed to compute settlements:', err);
@@ -230,9 +227,9 @@ export default function ExpenseSplitter({ tripId, members, currentUserId }) {
   const handleDeleteExpense = async (id) => {
     setDeleteId(id);
     try {
-      await fetchWithAuth(`/api/expenses/${id}`, { method: 'DELETE' });
+      await expensesApi.remove(id);
       setExpenses(prev => prev.filter(e => e.id !== id));
-      setSettlements(null); // invalidate cache
+      setSettlements(null);
     } catch (err) {
       console.error('Failed to delete expense:', err);
     } finally {

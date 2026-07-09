@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fetchWithAuth } from '../lib/supabaseClient';
+import { budgetApi } from '../lib/supabaseClient';
 import { X, Sparkles, DollarSign, MapPin, CalendarDays, Loader, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 const CATEGORY_COLORS = {
@@ -69,13 +69,10 @@ export default function BudgetSuggestModal({ tripId, tripDates, onClose, onImpor
     setSuggestion(null);
     setLoading(true);
     try {
-      const data = await fetchWithAuth('/api/budget-suggest', {
-        method: 'POST',
-        body: JSON.stringify({
-          destination: form.destination,
-          budget_inr: Number(form.budget_inr),
-          days: Number(form.days)
-        })
+      const data = await budgetApi.suggest({
+        destination: form.destination,
+        budget_inr: Number(form.budget_inr),
+        days: Number(form.days)
       });
       setSuggestion(data);
     } catch (err) {

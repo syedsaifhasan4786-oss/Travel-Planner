@@ -4,7 +4,6 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isMockMode = !supabaseUrl || !supabaseAnonKey;
-export const API_URL = 'http://localhost:3000';
 
 let realClient = null;
 
@@ -138,22 +137,17 @@ export const supabase = !isMockMode ? realClient : {
   channel: (name) => new MockChannel(name)
 };
 
-// Global Fetch helper that appends JWT authentication headers
+// Global Fetch helper — kept for mock mode fallback compatibility
 export async function fetchWithAuth(endpoint, options = {}) {
   let token = 'mock-user-id';
   
   if (!isMockMode) {
     const { data: { session } } = await realClient.auth.getSession();
-    if (session) {
-      token = session.access_token;
-    }
+    if (session) token = session.access_token;
   } else {
     const sessionStr = localStorage.getItem('tripboard_session');
     if (sessionStr) {
-      try {
-        const session = JSON.parse(sessionStr);
-        token = session.access_token;
-      } catch (e) {}
+      try { token = JSON.parse(sessionStr).access_token; } catch (e) {}
     }
   }
 
@@ -163,10 +157,8 @@ export async function fetchWithAuth(endpoint, options = {}) {
     ...options.headers
   };
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers
-  });
+  const API_URL = 'http://localhost:3000';
+  const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -175,3 +167,149 @@ export async function fetchWithAuth(endpoint, options = {}) {
 
   return response.json();
 }
+
+// ─────────────────────────────────────────────────────────
+// Direct Supabase API — no Express backend needed
+// ─────────────────────────────────────────────────────────
+
+function generateInviteCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+async function getClient() {
+  if (isMockMode) return null;
+  return realClient;
+}
+
+// TRIPS
+export const tripsApi = {
+  async list() {
+    if (isMockMode) return fetchWithAuth('/api/trips');
+    const db = await getClient();
+    const { data: { user } } = await db.auth.getUser();
+    const { data, error } = await db
+      .from('trip_members')
+      .select('trip:trips(*, trip_members(id, role, user_id))')
+      .eq('user_id', user.id);
+    if (error) throw error;
+    return (data || []).map(r => r.trip);
+  },
+
+  async get(tripId) {
+    if (isMockMode) return fetchWithAuth(`/api/trips/${tripId}`);
+    const db = await getClient();
+    const { data: trip, error: tripErr } = await db
+      .from('trips').select('*').eq('id', tripId).single();
+    if (tripErr) throw tripErr;
+    const { data: members } = await db
+      .from('trip_members').select('id, role, user_id').eq('trip_id', tripId);
+    const { data: itinerary } = await db
+      .from('itinerary_items').select('*').eq('trip_id', tripId).order('position_index');
+    return { ...trip, members: members || [], itinerary: itinerary || [] };
+  },
+
+  async create(payload) {
+    if (isMockMode) return fetchWithAuth('/api/trips', { method: 'POST', body: JSON.stringify(payload) });
+    const db = await getClient();
+    const { data: { user } } = await db.auth.getUser();
+    const { data: trip, error } = await db
+      .from('trips')
+      .insert({ ...payload, owner_id: user.id, invite_code: generateInviteCode() })
+      .select().single();
+    if (error) throw error;
+    await db.from('trip_members').insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
+    return trip;
+  },
+
+  async join(invite_code) {
+    if (isMockMode) return fetchWithAuth('/api/trips/join', { method: 'POST', body: JSON.stringify({ invite_code }) });
+    const db = await getClient();
+    const { data: { user } } = await db.auth.getUser();
+    const { data: trip, error } = await db
+      .from('trips').select('*').eq('invite_code', invite_code).single();
+    if (error || !trip) throw new Error('Invalid invite code');
+    const { error: joinErr } = await db
+      .from('trip_members').insert({ trip_id: trip.id, user_id: user.id, role: 'member' });
+    if (joinErr && !joinErr.message.includes('duplicate')) throw joinErr;
+    return { trip_id: trip.id };
+  }
+};
+
+// ITINERARY
+export const itineraryApi = {
+  async add(tripId, payload) {
+    if (isMockMode) return fetchWithAuth(`/api/trips/${tripId}/itinerary`, { method: 'POST', body: JSON.stringify(payload) });
+    const db = await getClient();
+    const { data, error } = await db
+      .from('itinerary_items').insert({ ...payload, trip_id: tripId }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(itemId, payload) {
+    if (isMockMode) return fetchWithAuth(`/api/itinerary/${itemId}`, { method: 'PUT', body: JSON.stringify(payload) });
+    const db = await getClient();
+    const { error } = await db.from('itinerary_items').update(payload).eq('id', itemId);
+    if (error) throw error;
+  },
+
+  async remove(itemId) {
+    if (isMockMode) return fetchWithAuth(`/api/itinerary/${itemId}`, { method: 'DELETE' });
+    const db = await getClient();
+    const { error } = await db.from('itinerary_items').delete().eq('id', itemId);
+    if (error) throw error;
+  }
+};
+
+// EXPENSES
+export const expensesApi = {
+  async list(tripId) {
+    if (isMockMode) return fetchWithAuth(`/api/trips/${tripId}/expenses`);
+    const db = await getClient();
+    const { data, error } = await db
+      .from('expenses').select('*, expense_splits(*)').eq('trip_id', tripId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async add(tripId, payload) {
+    if (isMockMode) return fetchWithAuth(`/api/trips/${tripId}/expenses`, { method: 'POST', body: JSON.stringify(payload) });
+    const db = await getClient();
+    const { split_among, ...expensePayload } = payload;
+    const { data: expense, error } = await db
+      .from('expenses').insert({ ...expensePayload, trip_id: tripId }).select().single();
+    if (error) throw error;
+    if (split_among?.length) {
+      const perPerson = expense.amount / split_among.length;
+      const splits = split_among.map(uid => ({ expense_id: expense.id, user_id: uid, amount: perPerson }));
+      await db.from('expense_splits').insert(splits);
+    }
+    return expense;
+  },
+
+  async remove(expenseId) {
+    if (isMockMode) return fetchWithAuth(`/api/expenses/${expenseId}`, { method: 'DELETE' });
+    const db = await getClient();
+    const { error } = await db.from('expenses').delete().eq('id', expenseId);
+    if (error) throw error;
+  },
+
+  async settlements(tripId) {
+    if (isMockMode) return fetchWithAuth(`/api/trips/${tripId}/settlements`);
+    const db = await getClient();
+    const { data, error } = await db.functions.invoke('calculate-settlements', { body: { trip_id: tripId } });
+    if (error) throw error;
+    return data;
+  }
+};
+
+// BUDGET SUGGEST
+export const budgetApi = {
+  async suggest(payload) {
+    if (isMockMode) return fetchWithAuth('/api/budget-suggest', { method: 'POST', body: JSON.stringify(payload) });
+    const db = await getClient();
+    const { data, error } = await db.functions.invoke('suggest-budget-trip', { body: payload });
+    if (error) throw error;
+    return data;
+  }
+};

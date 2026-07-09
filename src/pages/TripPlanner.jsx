@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase, fetchWithAuth, isMockMode } from '../lib/supabaseClient';
+import { supabase, isMockMode, tripsApi, itineraryApi } from '../lib/supabaseClient';
 import L from 'leaflet';
 import { 
   Compass, 
+  X,
   MapPin, 
   CalendarDays, 
   ArrowLeft, 
@@ -38,6 +39,8 @@ const getDefaultCoordinates = (destination) => {
   if (dest.includes('new york')) return { lat: 40.7128, lng: -74.0060 };
   if (dest.includes('rome')) return { lat: 41.9028, lng: 12.4964 };
   if (dest.includes('hawaii')) return { lat: 20.7984, lng: -156.3319 };
+  if (dest.includes('delhi')) return { lat: 28.7041, lng: 77.1025 };
+  if (dest.includes('lucknow')) return { lat: 26.8467, lng: 80.9462 };
   return { lat: 48.8566, lng: 2.3522 }; // Fallback to Paris
 };
 
@@ -60,11 +63,8 @@ export default function TripPlanner() {
     title: '',
     time: '12:00 PM',
     notes: '',
-    category: 'activity',
-    lat: '',
-    lng: ''
+    category: 'activity'
   });
-  const [useDefaultCoords, setUseDefaultCoords] = useState(true);
   
   // Invite states
   const [copied, setCopied] = useState(false);
@@ -116,18 +116,13 @@ export default function TripPlanner() {
   const fetchTripDetails = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     try {
-      const data = await fetchWithAuth(`/api/trips/${tripId}`);
+      const data = await tripsApi.get(tripId);
       setTrip(data);
       setItinerary(data.itinerary || []);
       setMembers(data.members || []);
-
       const range = getDatesRange(data.start_date, data.end_date);
       setDates(range);
-      
-      // Default to first date if none selected
-      if (!selectedDate && range.length > 0) {
-        setSelectedDate(range[0]);
-      }
+      if (!selectedDate && range.length > 0) setSelectedDate(range[0]);
     } catch (err) {
       console.error(err);
       alert('Error loading trip details.');
@@ -268,17 +263,26 @@ export default function TripPlanner() {
   const handleAddStop = async (e) => {
     e.preventDefault();
     try {
-      const coords = newStop.lat && newStop.lng ? 
-        { lat: Number(newStop.lat), lng: Number(newStop.lng) } : 
-        getDefaultCoordinates(trip.destination);
-
+      const coords = getDefaultCoordinates(trip.destination);
       const body = {
-        ...newStop,
+        title: newStop.title,
+        time: newStop.time,
+        notes: newStop.notes,
+        category: newStop.category,
         lat: coords.lat,
         lng: coords.lng,
         date: selectedDate,
         position_index: dayItems.length
       };
+      await itineraryApi.add(tripId, body);
+      setShowAddModal(false);
+      setNewStop({ title: '', time: '12:00 PM', notes: '', category: 'activity' });
+      fetchTripDetails(false);
+      broadcastChange();
+    } catch (err) {
+      alert(err.message || 'Failed to add stop');
+    }
+  };
 
       await fetchWithAuth(`/api/trips/${tripId}/itinerary`, {
         method: 'POST',
@@ -286,7 +290,7 @@ export default function TripPlanner() {
       });
 
       setShowAddModal(false);
-      setNewStop({ title: '', time: '12:00 PM', notes: '', category: 'activity', lat: '', lng: '' });
+      setNewStop({ title: '', time: '12:00 PM', notes: '', category: 'activity' });
       fetchTripDetails(false);
       broadcastChange();
     } catch (err) {
@@ -296,9 +300,8 @@ export default function TripPlanner() {
 
   const handleDeleteStop = async (itemId) => {
     if (!confirm('Are you sure you want to delete this activity stop?')) return;
-
     try {
-      await fetchWithAuth(`/api/itinerary/${itemId}`, { method: 'DELETE' });
+      await itineraryApi.remove(itemId);
       fetchTripDetails(false);
       broadcastChange();
     } catch (err) {
@@ -337,10 +340,7 @@ export default function TripPlanner() {
     try {
       // Perform updates sequentially
       for (const update of updates) {
-        await fetchWithAuth(`/api/itinerary/${update.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(update.updates)
-        });
+        await itineraryApi.update(update.id, update.updates);
       }
       fetchTripDetails(false);
       broadcastChange();
@@ -612,11 +612,13 @@ export default function TripPlanner() {
                     value={newStop.category}
                     onChange={(e) => setNewStop({ ...newStop, category: e.target.value })}
                   >
-                    <option value="activity">Activity</option>
-                    <option value="food">Food</option>
-                    <option value="lodging">Lodging</option>
-                    <option value="flight">Flight/Transit</option>
-                    <option value="other">Other</option>
+                    <option value="activity">🏛️ Sightseeing / Activity</option>
+                    <option value="departure">🚀 Starting Point / Departure</option>
+                    <option value="food">🍽️ Food / Dining</option>
+                    <option value="lodging">🏨 Hotel / Stay</option>
+                    <option value="flight">✈️ Travel / Transit</option>
+                    <option value="shopping">🛍️ Shopping</option>
+                    <option value="other">📌 Other</option>
                   </select>
                 </div>
               </div>
@@ -633,37 +635,7 @@ export default function TripPlanner() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group-saas" style={{ flex: 1 }}>
-                  <label className="form-label-saas" htmlFor="stop-lat">Latitude</label>
-                  <input
-                    type="text"
-                    id="stop-lat"
-                    className="form-input-saas"
-                    placeholder="e.g. 35.039"
-                    value={newStop.lat}
-                    onChange={(e) => setNewStop({ ...newStop, lat: e.target.value })}
-                    disabled={useDefaultCoords}
-                  />
-                </div>
-                <div className="form-group-saas" style={{ flex: 1 }}>
-                  <label className="form-label-saas" htmlFor="stop-lng">Longitude</label>
-                  <input
-                    type="text"
-                    id="stop-lng"
-                    className="form-input-saas"
-                    placeholder="e.g. 135.729"
-                    value={newStop.lng}
-                    onChange={(e) => setNewStop({ ...newStop, lng: e.target.value })}
-                    disabled={useDefaultCoords}
-                  />
-                </div>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input id="use-default-coords" type="checkbox" checked={useDefaultCoords} onChange={(e) => setUseDefaultCoords(e.target.checked)} />
-                <label htmlFor="use-default-coords" style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Use destination coordinates (recommended)</label>
-              </div>
 
               <button
                 type="submit"
@@ -695,18 +667,15 @@ export default function TripPlanner() {
             for (let i = 0; i < cats.length; i++) {
               const { key, category, label } = cats[i];
               if (day[key] > 0) {
-                await fetchWithAuth(`/api/trips/${tripId}/itinerary`, {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    title: `[Budget] Day ${day.day} ${label}`,
-                    time: '12:00 PM',
-                    notes: `Estimated cost: ₹${day[key]}. ${day.notes || ''}`,
-                    category,
-                    date,
-                    lat: defaultCoords.lat,
-                    lng: defaultCoords.lng,
-                    position_index: 100 + i
-                  })
+                await itineraryApi.add(tripId, {
+                  title: `[Budget] Day ${day.day} ${label}`,
+                  time: '12:00 PM',
+                  notes: `Estimated cost: ₹${day[key]}. ${day.notes || ''}`,
+                  category,
+                  date,
+                  lat: defaultCoords.lat,
+                  lng: defaultCoords.lng,
+                  position_index: 100 + i
                 });
               }
             }

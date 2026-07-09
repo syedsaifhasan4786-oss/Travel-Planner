@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase, fetchWithAuth } from '../lib/supabaseClient';
+import { supabase, tripsApi } from '../lib/supabaseClient';
 import { 
   Compass, 
   Plus, 
@@ -33,11 +33,11 @@ export default function Dashboard({ session }) {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      const data = await fetchWithAuth('/api/trips');
-      setTrips(data);
+      const data = await tripsApi.list();
+      setTrips(data || []);
     } catch (err) {
       console.error(err);
-      setErrorMsg('Failed to load trips. Make sure your backend server is running.');
+      setErrorMsg('Failed to load trips.');
     } finally {
       setLoading(false);
     }
@@ -51,14 +51,10 @@ export default function Dashboard({ session }) {
     e.preventDefault();
     setModalLoading(true);
     try {
-      const created = await fetchWithAuth('/api/trips', {
-        method: 'POST',
-        body: JSON.stringify(newTrip)
-      });
+      const created = await tripsApi.create(newTrip);
       setShowCreateModal(false);
       setNewTrip({ title: '', destination: '', start_date: '', end_date: '' });
-      fetchTrips(); // Refresh
-      navigate(`/app/trip/${created.id}`); // Route directly to new trip
+      navigate(`/app/trip/${created.id}`);
     } catch (err) {
       alert(err.message || 'Failed to create trip');
     } finally {
@@ -70,13 +66,10 @@ export default function Dashboard({ session }) {
     e.preventDefault();
     setModalLoading(true);
     try {
-      const result = await fetchWithAuth('/api/trips/join', {
-        method: 'POST',
-        body: JSON.stringify({ invite_code: inviteCode })
-      });
+      const result = await tripsApi.join(inviteCode);
       setShowJoinModal(false);
       setInviteCode('');
-      navigate(`/app/trip/${result.trip_id}`); // Navigate directly to joined trip
+      navigate(`/app/trip/${result.trip_id}`);
     } catch (err) {
       alert(err.message || 'Failed to join trip. Please verify the code.');
     } finally {
