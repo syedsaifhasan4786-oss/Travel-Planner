@@ -218,10 +218,19 @@ export const tripsApi = {
       .from('trips').select('*').eq('id', tripId).single();
     if (tripErr) throw tripErr;
     const { data: members } = await db
-      .from('trip_members').select('id, role, user_id').eq('trip_id', tripId);
+      .from('trip_members')
+      .select('id, role, user_id, user:users(id, name, email)')
+      .eq('trip_id', tripId);
     const { data: itinerary } = await db
       .from('itinerary_items').select('*').eq('trip_id', tripId).order('position_index');
-    return { ...trip, members: members || [], itinerary: itinerary || [] };
+    // Flatten members to include user details
+    const flatMembers = (members || []).map(m => ({
+      id: m.user_id,
+      name: m.user?.name || '',
+      email: m.user?.email || '',
+      role: m.role
+    }));
+    return { ...trip, members: flatMembers, itinerary: itinerary || [] };
   },
 
   async create(payload) {
