@@ -284,20 +284,6 @@ export default function TripPlanner() {
     }
   };
 
-      await fetchWithAuth(`/api/trips/${tripId}/itinerary`, {
-        method: 'POST',
-        body: JSON.stringify(body)
-      });
-
-      setShowAddModal(false);
-      setNewStop({ title: '', time: '12:00 PM', notes: '', category: 'activity' });
-      fetchTripDetails(false);
-      broadcastChange();
-    } catch (err) {
-      alert(err.message || 'Failed to add stop');
-    }
-  };
-
   const handleDeleteStop = async (itemId) => {
     if (!confirm('Are you sure you want to delete this activity stop?')) return;
     try {
