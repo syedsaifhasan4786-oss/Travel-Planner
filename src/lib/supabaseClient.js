@@ -230,7 +230,7 @@ export const tripsApi = {
     const { data: { user } } = await db.auth.getUser();
     const { data: trip, error } = await db
       .from('trips')
-      .insert({ ...payload, owner_id: user.id, invite_code: generateInviteCode() })
+      .insert({ ...payload, invite_code: generateInviteCode() })
       .select().single();
     if (error) throw error;
     await db.from('trip_members').insert({ trip_id: trip.id, user_id: user.id, role: 'owner' });
